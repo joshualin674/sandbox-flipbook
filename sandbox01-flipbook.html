@@ -6,7 +6,7 @@
   <title>Sandbox — Flipbook</title>
 
   <!-- PDF.js (browser build) -->
-  <script src="https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.js"></script>
   
   <style>
     :root{
@@ -314,7 +314,7 @@
     // PDF.js worker (CDN)
     // Note: pdf.js expects workerSrc to be set when using a CDN build.
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js";
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";
 
 
     function openModal(title, html){
