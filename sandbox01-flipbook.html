@@ -6,8 +6,8 @@
   <title>Sandbox — Flipbook</title>
 
   <!-- PDF.js (browser build) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
-
+  <script src="https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.min.js"></script>
+  
   <style>
     :root{
       --bg: #f7f6f1;
@@ -314,7 +314,8 @@
     // PDF.js worker (CDN)
     // Note: pdf.js expects workerSrc to be set when using a CDN build.
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+      "https://unpkg.com/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js";
+
 
     function openModal(title, html){
       modalTitle.textContent = title || "note";
