@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sandbox — Flipbook</title>
+
+  <!-- PDF.js (browser build) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+
+  <style>
+    :root{
+      --bg: #f7f6f1;
+      --ink: #111;
+      --muted: rgba(0,0,0,.55);
+      --line: rgba(0,0,0,.12);
+      --panel: rgba(255,255,255,.6);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font: 13px/1.25 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      letter-spacing:.1px;
+    }
+
+    /* Layout */
+    .wrap{
+      display:grid;
+      grid-template-columns: 280px 1fr;
+      min-height:100svh;
+    }
+    .toc{
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100svh;
+      overflow:auto;
+      background: linear-gradient(to bottom, rgba(255,255,255,.35), rgba(255,255,255,.0));
+      backdrop-filter: blur(4px);
+    }
+    .toc h1{
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: lowercase;
+    }
+    .toc .meta{
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .toc .item{
+      display:flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 8px;
+      border-radius: 10px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .toc .item:hover{
+      background: rgba(0,0,0,.04);
+    }
+    .toc .item .t{ color: var(--ink); }
+    .toc .item .p{ color: var(--muted); }
+
+    .stage{
+      position: relative;
+      padding: 18px;
+      display:flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    /* Controls */
+    .controls{
+      width: min(980px, 100%);
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      backdrop-filter: blur(6px);
+    }
+    .controls .left, .controls .right{
+      display:flex; gap: 10px; align-items:center;
+    }
+    button{
+      appearance:none;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.6);
+      padding: 7px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      color: var(--ink);
+    }
+    button:hover{ background: rgba(255,255,255,.85); }
+    button:disabled{ opacity:.4; cursor:default; }
+    .pageLabel{ color: var(--muted); min-width: 110px; text-align:center; }
+
+    input[type="range"]{
+      width: 240px;
+      accent-color: #111;
+    }
+
+    /* Viewer */
+    .viewerShell{
+      width: min(980px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow:hidden;
+      background: rgba(255,255,255,.35);
+      box-shadow: 0 8px 40px rgba(0,0,0,.08);
+    }
+    .viewer{
+      position: relative;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding: 18px;
+    }
+    canvas{
+      width: 100%;
+      height: auto;
+      display:block;
+      border-radius: 12px;
+      background: white;
+    }
+
+    /* Hotspot overlay */
+    .overlay{
+      position:absolute;
+      inset: 18px;
+      pointer-events:none; /* hotspots re-enable pointer events individually */
+    }
+    .hotspot{
+      position:absolute;
+      border-radius: 12px;
+      outline: 1px dashed rgba(0,0,0,.25);
+      background: rgba(255,255,255,.0);
+      pointer-events:auto;
+      cursor:pointer;
+      transition: background .12s ease, outline-color .12s ease;
+    }
+    .hotspot:hover{
+      background: rgba(0,0,0,.04);
+      outline-color: rgba(0,0,0,.45);
+    }
+
+    /* Modal (for interactions) */
+    .modalBack{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 9999;
+    }
+    .modal{
+      width: min(720px, 100%);
+      background: rgba(255,255,255,.9);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      backdrop-filter: blur(8px);
+    }
+    .modalHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .modalHead .title{
+      font-weight: 600;
+      text-transform: lowercase;
+    }
+    .modalBody{ color: var(--ink); }
+    .modalBody p{ margin: 0 0 10px; color: var(--muted); }
+
+    /* Mobile */
+    @media (max-width: 900px){
+      .wrap{ grid-template-columns: 1fr; }
+      .toc{
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+      .controls{ flex-wrap: wrap; justify-content:center; }
+      input[type="range"]{ width: 200px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <aside class="toc" id="toc">
+      <h1>contents</h1>
+      <div class="meta" id="meta">loading…</div>
+      <div id="tocList"></div>
+    </aside>
+
+    <main class="stage">
+      <div class="controls">
+        <div class="left">
+          <button id="btnPrev">prev</button>
+          <button id="btnNext">next</button>
+        </div>
+
+        <div class="pageLabel" id="pageLabel">—</div>
+
+        <div class="right">
+          <input id="scrub" type="range" min="1" max="1" step="1" value="1" />
+          <button id="btnToc">toc</button>
+        </div>
+      </div>
+
+      <div class="viewerShell">
+        <div class="viewer">
+          <canvas id="pdfCanvas"></canvas>
+          <div class="overlay" id="overlay"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal for interactive content -->
+  <div class="modalBack" id="modalBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modalHead">
+        <div class="title" id="modalTitle">note</div>
+        <button id="modalClose">close</button>
+      </div>
+      <div class="modalBody" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    /**********************
+     * 1) Point this to your uploaded PDF
+     **********************/
+    const PDF_URL = "sandbox_01_1.pdf"; // <-- replace with your Cargo file URL if needed
+
+    /**********************
+     * 2) Manual TOC (fallback)
+     * If your PDF has an embedded outline, we’ll use that automatically.
+     * Otherwise, define entries here.
+     **********************/
+    const MANUAL_TOC = [
+      // { title: "cover", page: 1 },
+      // { title: "editorial", page: 3 },
+      // { title: "features", page: 12 },
+    ];
+
+    /**********************
+     * 3) Hotspots (interactive regions)
+     * Coordinates are percentages of the rendered page area (0..100)
+     * Each hotspot has an action type you can customize.
+     **********************/
+    const HOTSPOTS = [
+      // Example:
+      // {
+      //   page: 2,
+      //   x: 12, y: 20, w: 28, h: 10,
+      //   action: { type: "modal", title: "process note", html: "<p>Add your commentary here.</p><div>Anything HTML works.</div>" }
+      // },
+      // {
+      //   page: 5,
+      //   x: 60, y: 72, w: 22, h: 8,
+      //   action: { type: "link", href: "https://example.com", label: "open related page" }
+      // }
+    ];
+
+    /**********************
+     * Core viewer state
+     **********************/
+    const $ = (s) => document.querySelector(s);
+
+    const canvas = $("#pdfCanvas");
+    const ctx = canvas.getContext("2d");
+    const overlay = $("#overlay");
+    const tocList = $("#tocList");
+    const meta = $("#meta");
+
+    const btnPrev = $("#btnPrev");
+    const btnNext = $("#btnNext");
+    const btnToc  = $("#btnToc");
+    const scrub   = $("#scrub");
+    const pageLabel = $("#pageLabel");
+
+    const modalBack = $("#modalBack");
+    const modalTitle = $("#modalTitle");
+    const modalBody  = $("#modalBody");
+    const modalClose = $("#modalClose");
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let totalPages = 1;
+    let rendering = false;
+
+    // Cargo-friendly: don’t rely on heavy animations; keep it crisp.
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    // PDF.js worker (CDN)
+    // Note: pdf.js expects workerSrc to be set when using a CDN build.
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+
+    function openModal(title, html){
+      modalTitle.textContent = title || "note";
+      modalBody.innerHTML = html || "";
+      modalBack.style.display = "flex";
+      modalBack.setAttribute("aria-hidden", "false");
+    }
+    function closeModal(){
+      modalBack.style.display = "none";
+      modalBack.setAttribute("aria-hidden", "true");
+      modalBody.innerHTML = "";
+    }
+    modalClose.addEventListener("click", closeModal);
+    modalBack.addEventListener("click", (e) => { if(e.target === modalBack) closeModal(); });
+    window.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
+
+    async function renderPage(num){
+      if(!pdfDoc || rendering) return;
+      rendering = true;
+
+      const page = await pdfDoc.getPage(num);
+
+      // Fit to container width
+      const shell = document.querySelector(".viewer");
+      const maxWidth = Math.min(shell.clientWidth - 36, 944); // padding aware
+      const unscaled = page.getViewport({ scale: 1 });
+      const scale = maxWidth / unscaled.width;
+
+      const viewport = page.getViewport({ scale });
+      canvas.width  = Math.floor(viewport.width * DPR);
+      canvas.height = Math.floor(viewport.height * DPR);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+      // Match overlay to the visible canvas box
+      overlay.style.width = canvas.style.width;
+      overlay.style.height = canvas.style.height;
+      overlay.style.left = "18px";
+      overlay.style.top  = "18px";
+
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      pageNum = num;
+      scrub.value = String(pageNum);
+      pageLabel.textContent = `${pageNum} / ${totalPages}`;
+
+      btnPrev.disabled = pageNum <= 1;
+      btnNext.disabled = pageNum >= totalPages;
+
+      drawHotspots(pageNum);
+
+      rendering = false;
+    }
+
+    function drawHotspots(currentPage){
+      overlay.innerHTML = "";
+      const list = HOTSPOTS.filter(h => h.page === currentPage);
+
+      for(const h of list){
+        const el = document.createElement("div");
+        el.className = "hotspot";
+
+        // position in % of overlay
+        el.style.left = `${h.x}%`;
+        el.style.top = `${h.y}%`;
+        el.style.width = `${h.w}%`;
+        el.style.height = `${h.h}%`;
+
+        el.title = (h.action?.label || h.action?.title || "interactive").toLowerCase();
+
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          runAction(h.action);
+        });
+
+        overlay.appendChild(el);
+      }
+    }
+
+    function runAction(action){
+      if(!action) return;
+      if(action.type === "modal"){
+        openModal(action.title || "note", action.html || "<p>(empty)</p>");
+      }else if(action.type === "link"){
+        window.open(action.href, "_blank", "noopener,noreferrer");
+      }else if(action.type === "jump"){
+        const p = Math.max(1, Math.min(totalPages, action.page || 1));
+        renderPage(p);
+      }else{
+        openModal("note", `<p>Unknown action type:</p><div>${String(action.type)}</div>`);
+      }
+    }
+
+    function buildToc(entries){
+      tocList.innerHTML = "";
+      for(const it of entries){
+        const row = document.createElement("div");
+        row.className = "item";
+        row.innerHTML = `<div class="t">${escapeHtml(it.title || "section")}</div><div class="p">${it.page}</div>`;
+        row.addEventListener("click", () => renderPage(it.page));
+        tocList.appendChild(row);
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+      }[m]));
+    }
+
+    async function loadOutlineAsToc(){
+      // If the PDF has an outline, turn it into TOC entries.
+      // Some PDFs don’t include an outline; we fall back to MANUAL_TOC.
+      const outline = await pdfDoc.getOutline();
+      if(!outline || outline.length === 0) return null;
+
+      const flat = [];
+      async function walk(items, depth=0){
+        for(const o of items){
+          let page = null;
+          try{
+            if(o.dest){
+              const dest = await pdfDoc.getDestination(o.dest);
+              const ref = dest && dest[0];
+              if(ref){
+                page = await pdfDoc.getPageIndex(ref) + 1;
+              }
+            }
+          }catch(_){}
+          if(page){
+            flat.push({ title: `${"— ".repeat(Math.min(depth,2))}${o.title}`.toLowerCase(), page });
+          }
+          if(o.items && o.items.length){
+            await walk(o.items, depth+1);
+          }
+        }
+      }
+      await walk(outline);
+      return flat.length ? flat : null;
+    }
+
+    function toggleToc(){
+      const toc = document.getElementById("toc");
+      const isHidden = toc.style.display === "none";
+      toc.style.display = isHidden ? "" : "none";
+      document.querySelector(".wrap").style.gridTemplateColumns = isHidden ? "280px 1fr" : "1fr";
+    }
+
+    // Controls
+    btnPrev.addEventListener("click", () => renderPage(Math.max(1, pageNum - 1)));
+    btnNext.addEventListener("click", () => renderPage(Math.min(totalPages, pageNum + 1)));
+
+    scrub.addEventListener("input", () => {
+      const p = parseInt(scrub.value, 10) || 1;
+      renderPage(p);
+    });
+
+    btnToc.addEventListener("click", toggleToc);
+
+    // Keyboard nav (nice for “flipbook” feel)
+    window.addEventListener("keydown", (e) => {
+      if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+      if(e.key === "ArrowLeft") btnPrev.click();
+      if(e.key === "ArrowRight") btnNext.click();
+    });
+
+    // Re-render on resize (debounced)
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => renderPage(pageNum), 120);
+    });
+
+    // Boot
+    (async function init(){
+      meta.textContent = "loading pdf…";
+      pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
+      totalPages = pdfDoc.numPages;
+
+      scrub.min = "1";
+      scrub.max = String(totalPages);
+      scrub.value = "1";
+
+      meta.textContent = `pages: ${totalPages}`;
+
+      const outlineToc = await loadOutlineAsToc();
+      if(outlineToc){
+        buildToc(outlineToc);
+      }else if(MANUAL_TOC.length){
+        buildToc(MANUAL_TOC.map(x => ({...x, title: (x.title||"section").toLowerCase()})));
+      }else{
+        // minimal fallback: show page numbers
+        buildToc(Array.from({length: totalPages}, (_,i) => ({ title: `page ${i+1}`, page: i+1 })));
+      }
+
+      await renderPage(1);
+    })();
+  </script>
+</body>
+</html>
