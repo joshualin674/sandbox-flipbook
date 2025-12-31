@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sandbox — Flipbook</title>
 
-  <!-- PDF.js (browser build) -->
+  <!-- Local PDF.js (no CDN issues) -->
   <script src="./pdf.min.js"></script>
-  
+
   <style>
     :root{
       --bg: #f7f6f1;
       --ink: #111;
       --muted: rgba(0,0,0,.55);
       --line: rgba(0,0,0,.12);
-      --panel: rgba(255,255,255,.6);
+      --panel: rgba(255,255,255,.72);
     }
+
     *{ box-sizing:border-box; }
     body{
       margin:0;
@@ -23,123 +24,94 @@
       color:var(--ink);
       font: 13px/1.25 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       letter-spacing:.1px;
+      overflow-x:hidden;
     }
 
-    /* Layout */
-    .wrap{
-      display:grid;
-      grid-template-columns: 280px 1fr;
-      min-height:100svh;
-    }
-    .toc{
-      border-right: 1px solid var(--line);
-      padding: 18px 14px;
+    /* ======= Minimal top bar ======= */
+    .topbar{
       position: sticky;
       top: 0;
-      height: 100svh;
-      overflow:auto;
-      background: linear-gradient(to bottom, rgba(255,255,255,.35), rgba(255,255,255,.0));
-      backdrop-filter: blur(4px);
-    }
-    .toc h1{
-      margin: 0 0 10px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: lowercase;
-    }
-    .toc .meta{
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-    .toc .item{
+      z-index: 50;
       display:flex;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 8px 8px;
-      border-radius: 10px;
-      cursor:pointer;
+      align-items:center;
+      justify-content:space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.35);
+      backdrop-filter: blur(8px);
+    }
+    .topbar .left,
+    .topbar .right{
+      width: 140px; /* keeps center truly centered */
+      display:flex;
+      align-items:center;
+      gap: 8px;
+    }
+    .topbar .center{
+      flex:1;
+      text-align:center;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
       user-select:none;
     }
-    .toc .item:hover{
-      background: rgba(0,0,0,.04);
-    }
-    .toc .item .t{ color: var(--ink); }
-    .toc .item .p{ color: var(--muted); }
 
-    .stage{
-      position: relative;
-      padding: 18px;
-      display:flex;
-      flex-direction: column;
-      gap: 12px;
-      align-items: center;
-      justify-content: flex-start;
-    }
-
-    /* Controls */
-    .controls{
-      width: min(980px, 100%);
-      display:flex;
-      gap: 10px;
-      align-items:center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: var(--panel);
-      backdrop-filter: blur(6px);
-    }
-    .controls .left, .controls .right{
-      display:flex; gap: 10px; align-items:center;
-    }
     button{
       appearance:none;
       border: 1px solid var(--line);
-      background: rgba(255,255,255,.6);
+      background: var(--panel);
       padding: 7px 10px;
-      border-radius: 12px;
+      border-radius: 999px;
       cursor:pointer;
       color: var(--ink);
+      line-height: 1;
     }
-    button:hover{ background: rgba(255,255,255,.85); }
-    button:disabled{ opacity:.4; cursor:default; }
-    .pageLabel{ color: var(--muted); min-width: 110px; text-align:center; }
+    button:hover{ background: rgba(255,255,255,.92); }
+    button:disabled{ opacity:.35; cursor:default; }
 
-    input[type="range"]{
-      width: 240px;
-      accent-color: #111;
+    /* ======= Stage ======= */
+    .stage{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px 14px 28px;
     }
 
-    /* Viewer */
-    .viewerShell{
-      width: min(980px, 100%);
+    .spreadShell{
       border: 1px solid var(--line);
       border-radius: 18px;
       overflow:hidden;
-      background: rgba(255,255,255,.35);
+      background: rgba(255,255,255,.25);
       box-shadow: 0 8px 40px rgba(0,0,0,.08);
     }
-    .viewer{
-      position: relative;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      padding: 18px;
+
+    .spread{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px; /* seam */
+      background: var(--line);
+      padding: 14px;
     }
-    canvas{
+
+    .page{
+      position: relative;
+      background: white;
+      border-radius: 12px;
+      overflow:hidden;
+    }
+
+    /* Each page has its own canvas + overlay */
+    .page canvas{
       width: 100%;
       height: auto;
       display:block;
-      border-radius: 12px;
       background: white;
     }
 
-    /* Hotspot overlay */
     .overlay{
       position:absolute;
-      inset: 18px;
-      pointer-events:none; /* hotspots re-enable pointer events individually */
+      inset: 0;
+      pointer-events:none;
     }
+
     .hotspot{
       position:absolute;
       border-radius: 12px;
@@ -154,7 +126,87 @@
       outline-color: rgba(0,0,0,.45);
     }
 
-    /* Modal (for interactions) */
+    /* Single-page mode: just show one column */
+    .spread.single{
+      grid-template-columns: 1fr;
+    }
+    .page.hidden{
+      display:none;
+    }
+
+    /* ======= TOC drawer ======= */
+    .drawerBack{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.28);
+      display:none;
+      z-index: 999;
+    }
+    .drawer{
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100svh;
+      width: min(380px, 86vw);
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(10px);
+      border-left: 1px solid var(--line);
+      padding: 14px;
+      overflow:auto;
+      transform: translateX(100%);
+      transition: transform .18s ease;
+      z-index: 1000;
+    }
+    .drawer.open{ transform: translateX(0); }
+    .drawerBack.open{ display:block; }
+
+    .tocTitle{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .tocTitle .h{
+      font-weight: 600;
+      text-transform: lowercase;
+    }
+    .tocMeta{
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .tocSection{
+      margin: 10px 0 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .tocSection:first-of-type{
+      border-top:none;
+      padding-top:0;
+    }
+
+    .tocSection .label{
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: lowercase;
+      margin-bottom: 6px;
+    }
+
+    .tocItem{
+      display:flex;
+      justify-content:space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .tocItem:hover{ background: rgba(0,0,0,.04); }
+    .tocItem .t{ color: var(--ink); text-transform: lowercase; }
+    .tocItem .p{ color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* ======= Modal ======= */
     .modalBack{
       position: fixed;
       inset: 0;
@@ -163,7 +215,7 @@
       align-items:center;
       justify-content:center;
       padding: 18px;
-      z-index: 9999;
+      z-index: 2000;
     }
     .modal{
       width: min(720px, 100%);
@@ -187,52 +239,60 @@
     .modalBody{ color: var(--ink); }
     .modalBody p{ margin: 0 0 10px; color: var(--muted); }
 
-    /* Mobile */
-    @media (max-width: 900px){
-      .wrap{ grid-template-columns: 1fr; }
-      .toc{
-        position: relative;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid var(--line);
-      }
-      .controls{ flex-wrap: wrap; justify-content:center; }
-      input[type="range"]{ width: 200px; }
+    /* Mobile: reduce padding, keep it clean */
+    @media (max-width: 860px){
+      .topbar .left, .topbar .right{ width: 110px; }
+      .spread{ padding: 10px; }
     }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <aside class="toc" id="toc">
-      <h1>contents</h1>
-      <div class="meta" id="meta">loading…</div>
-      <div id="tocList"></div>
-    </aside>
 
-    <main class="stage">
-      <div class="controls">
-        <div class="left">
-          <button id="btnPrev">prev</button>
-          <button id="btnNext">next</button>
-        </div>
+  <!-- Minimal UI bar -->
+  <div class="topbar">
+    <div class="left">
+      <button id="btnLeft" aria-label="Previous">←</button>
+    </div>
 
-        <div class="pageLabel" id="pageLabel">—</div>
+    <div class="center" id="pageLabel">loading…</div>
 
-        <div class="right">
-          <input id="scrub" type="range" min="1" max="1" step="1" value="1" />
-          <button id="btnToc">toc</button>
-        </div>
-      </div>
-
-      <div class="viewerShell">
-        <div class="viewer">
-          <canvas id="pdfCanvas"></canvas>
-          <div class="overlay" id="overlay"></div>
-        </div>
-      </div>
-    </main>
+    <div class="right" style="justify-content:flex-end;">
+      <button id="btnToc" aria-label="Table of contents">toc</button>
+      <button id="btnRight" aria-label="Next">→</button>
+    </div>
   </div>
+
+  <div class="stage">
+    <div class="spreadShell">
+      <div class="spread" id="spread">
+
+        <!-- Left page -->
+        <div class="page" id="pageA">
+          <canvas id="canvasA"></canvas>
+          <div class="overlay" id="overlayA"></div>
+        </div>
+
+        <!-- Right page -->
+        <div class="page" id="pageB">
+          <canvas id="canvasB"></canvas>
+          <div class="overlay" id="overlayB"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- TOC drawer -->
+  <div class="drawerBack" id="drawerBack"></div>
+  <aside class="drawer" id="drawer">
+    <div class="tocTitle">
+      <div class="h">contents</div>
+      <button id="btnCloseToc" aria-label="Close">close</button>
+    </div>
+    <div class="tocMeta" id="tocMeta">—</div>
+    <div id="tocRoot"></div>
+  </aside>
 
   <!-- Modal for interactive content -->
   <div class="modalBack" id="modalBack" aria-hidden="true">
@@ -247,56 +307,207 @@
 
   <script>
     /**********************
-     * 1) Point this to your uploaded PDF
+     * FILES (local)
      **********************/
-    const PDF_URL = "https://joshualin674.github.io/sandbox-flipbook/sandbox_01_1.pdf";
+    const PDF_URL = "./sandbox_01_1.pdf";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.js";
 
     /**********************
-     * 2) Manual TOC (fallback)
-     * If your PDF has an embedded outline, we’ll use that automatically.
-     * Otherwise, define entries here.
+     * TOC (easy to edit)
+     * - "page" is a PDF page number (1-based).
+     * - You can add items inside each section.
      **********************/
-    const MANUAL_TOC = [
-      // { title: "cover", page: 1 },
-      // { title: "editorial", page: 3 },
-      // { title: "features", page: 12 },
-    ];
+    const SECTIONS = [
+    {
+      title: "editor’s note & call for submissions",
+      page: 1,
+      items: [
+        { title: "editor’s note", page: 1 },
+        { title: "assembly by…", page: 2 },
+        { title: "contributors", page: 3 },
+        { title: "special thanks", page: 4 },
+        { title: "call for submissions", page: 5 },
+      ]
+    },
+    {
+      title: "open forum",
+      page: 3,
+      items: [
+        { title: "what makes a place matter", page: 1 },
+        { title: "what designers should pay attention to", page: 2 },
+        { title: "how virtual place takes shape", page: 3 },
+        { title: "how relationships shape perception of place", page: 4 },
+        { title: "how changing places change us", page: 5 },
+        { title: "design as problem-solving and agency", page: 6 },
+      ]
+    },
+    {
+      title: "reflections on open forum",
+      page: 23,
+      items: [
+        { title: "miguel pita, student", page: 1 },
+        { title: "michael stradley, instructor", page: 2 },
+      ]
+    },
+    {
+      title: "parking lot",
+      page: 25
+    },
+    {
+      title: "the afterlife of domestic space",
+      page: 27
+    },
+    {
+      title: "the wicked problem of place",
+      page: 37
+    },
+    {
+      title: "urban monastery",
+      page: 41
+    },
+    {
+      title: "place and placelessness in the digital realm",
+      page: 49,
+      items: [
+        { title: "abstract", page: 1 }
+      ]
+    },
+    {
+      title: "the reshaping of spatial memory & perception in the digital age",
+      page: 53,
+      items: [
+        { title: "abstract", page: 1 },
+        { title: "what is place in the digital age?", page: 2 },
+        { title: "how are digital worlds influencing our real one?", page: 3 },
+        { title: "how do architects and designers respond?", page: 4 },
+        { title: "conclusion", page: 5 },
+      ]
+    },
+    {
+      title: "an exploration of place and augmented reality",
+      page: 57,
+      items: [
+        { title: "introduction", page: 1 },
+        { title: "reality 1: decentralized meaning", page: 2 },
+        { title: "reality 2: centralized meaning", page: 3 },
+        { title: "reality 3: unmediated reality", page: 4 },
+        { title: "conclusion", page: 5 },
+      ]
+    },
+    {
+      title: "sensor-field",
+      page: 59,
+      items: [
+        { title: "making socio-ecological place across spacetime", page: 1 },
+        { title: "mapper", page: 2 },
+        { title: "sensor-field", page: 3 },
+        { title: "spine-line interventions", page: 4 },
+      ]
+    },
+    {
+      title: "public space & landscape",
+      page: 69,
+      items: [
+        { title: "introduction", page: 1 },
+        { title: "the american dream in catalunya", page: 2 },
+        { title: "environmental concerns of the metropolitan territory", page: 3 },
+        { title: "territory of mosaics", page: 4 },
+        { title: "intervention strategy", page: 5 },
+      ]
+    },
+    {
+      title: "fields of convergence",
+      page: 81
+    },
+    {
+      title: "a (nashvillian’s) tale of two parthenons",
+      page: 103,
+      items: [
+        { title: "birth", page: 1 },
+        { title: "death", page: 2 },
+        { title: "reincarnation", page: 3 },
+      ]
+    },
+    {
+      title: "bankhead",
+      page: 109,
+      items: [
+        { title: "introduction", page: 1 },
+        { title: "disparity", page: 2 },
+        { title: "complexity", page: 3 },
+      ]
+    },
+    {
+      title: "porous housing",
+      page: 119,
+      items: [
+        { title: "reimagining urban domesticity through thresholds", page: 1 },
+        { title: "conclusions", page: 2 },
+      ]
+    },
+    {
+      title: "let’s meet at the bars",
+      page: 121,
+      items: [
+        { title: "posters", page: 1 },
+      ]
+    },
+    {
+      title: "the (woman) architect",
+      page: 123,
+      items: [
+        { title: "invisibility and place", page: 1 },
+      ]
+    },
+    {
+      title: "closing remarks",
+      page: 125,
+      items: [
+        { title: "closing remarks", page: 1 },
+        { title: "contact us", page: 2 },
+      ]
+    }
+  ];
+
 
     /**********************
-     * 3) Hotspots (interactive regions)
-     * Coordinates are percentages of the rendered page area (0..100)
-     * Each hotspot has an action type you can customize.
+     * HOTSPOTS (interactive regions)
+     * - page: PDF page #
+     * - x,y,w,h are % of that page (0..100)
+     * - slot: "A" (left) or "B" (right) optional; we’ll auto place based on which page is visible.
      **********************/
     const HOTSPOTS = [
-      // Example:
-      // {
-      //   page: 2,
-      //   x: 12, y: 20, w: 28, h: 10,
-      //   action: { type: "modal", title: "process note", html: "<p>Add your commentary here.</p><div>Anything HTML works.</div>" }
-      // },
-      // {
-      //   page: 5,
-      //   x: 60, y: 72, w: 22, h: 8,
-      //   action: { type: "link", href: "https://example.com", label: "open related page" }
-      // }
+      // { page: 2, x: 10, y: 20, w: 30, h: 10, action:{ type:"modal", title:"note", html:"<p>hello</p>" } },
+      // { page: 5, x: 60, y: 70, w: 30, h: 12, action:{ type:"link", href:"https://example.com", label:"open" } },
     ];
 
     /**********************
-     * Core viewer state
+     * Core state
      **********************/
     const $ = (s) => document.querySelector(s);
 
-    const canvas = $("#pdfCanvas");
-    const ctx = canvas.getContext("2d");
-    const overlay = $("#overlay");
-    const tocList = $("#tocList");
-    const meta = $("#meta");
+    const spreadEl = $("#spread");
 
-    const btnPrev = $("#btnPrev");
-    const btnNext = $("#btnNext");
-    const btnToc  = $("#btnToc");
-    const scrub   = $("#scrub");
+    const canvasA = $("#canvasA");
+    const canvasB = $("#canvasB");
+    const ctxA = canvasA.getContext("2d");
+    const ctxB = canvasB.getContext("2d");
+
+    const pageAEl = $("#pageA");
+    const pageBEl = $("#pageB");
+    const overlayA = $("#overlayA");
+    const overlayB = $("#overlayB");
+
+    const btnLeft = $("#btnLeft");
+    const btnRight = $("#btnRight");
+    const btnToc = $("#btnToc");
     const pageLabel = $("#pageLabel");
+
+    const drawer = $("#drawer");
+    const drawerBack = $("#drawerBack");
+    const btnCloseToc = $("#btnCloseToc");
+    const tocMeta = $("#tocMeta");
+    const tocRoot = $("#tocRoot");
 
     const modalBack = $("#modalBack");
     const modalTitle = $("#modalTitle");
@@ -304,20 +515,18 @@
     const modalClose = $("#modalClose");
 
     let pdfDoc = null;
-    let pageNum = 1;
     let totalPages = 1;
+
+    // "cursor" is the left page number of a spread (or the single page for cover/back cover)
+    let cursor = 1;
+
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let rendering = false;
 
-    // Cargo-friendly: don’t rely on heavy animations; keep it crisp.
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-
-    // PDF.js worker (CDN)
-    // Note: pdf.js expects workerSrc to be set when using a CDN build.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.js";
-
+    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
     function openModal(title, html){
-      modalTitle.textContent = title || "note";
+      modalTitle.textContent = (title || "note").toLowerCase();
       modalBody.innerHTML = html || "";
       modalBack.style.display = "flex";
       modalBack.setAttribute("aria-hidden", "false");
@@ -331,61 +540,74 @@
     modalBack.addEventListener("click", (e) => { if(e.target === modalBack) closeModal(); });
     window.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 
-    async function renderPage(num){
-      if(!pdfDoc || rendering) return;
-      rendering = true;
-
-      const page = await pdfDoc.getPage(num);
-
-      // Fit to container width
-      const shell = document.querySelector(".viewer");
-      const maxWidth = Math.min(shell.clientWidth - 36, 944); // padding aware
-      const unscaled = page.getViewport({ scale: 1 });
-      const scale = maxWidth / unscaled.width;
-
-      const viewport = page.getViewport({ scale });
-      canvas.width  = Math.floor(viewport.width * DPR);
-      canvas.height = Math.floor(viewport.height * DPR);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-      // Match overlay to the visible canvas box
-      overlay.style.width = canvas.style.width;
-      overlay.style.height = canvas.style.height;
-      overlay.style.left = "18px";
-      overlay.style.top  = "18px";
-
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      pageNum = num;
-      scrub.value = String(pageNum);
-      pageLabel.textContent = `${pageNum} / ${totalPages}`;
-
-      btnPrev.disabled = pageNum <= 1;
-      btnNext.disabled = pageNum >= totalPages;
-
-      drawHotspots(pageNum);
-
-      rendering = false;
+    function isCover(){ return cursor === 1; }
+    function isBackCover(){ return cursor === totalPages; }
+    function isSpread(){
+      // Spread starts at 2, then 4, 6, ... and must have a right page available
+      return cursor >= 2 && cursor < totalPages;
+    }
+    function rightPageNum(){
+      return isSpread() ? cursor + 1 : null;
     }
 
-    function drawHotspots(currentPage){
-      overlay.innerHTML = "";
-      const list = HOTSPOTS.filter(h => h.page === currentPage);
+    function uiUpdate(){
+      // Page label (upper center)
+      if(isCover()){
+        pageLabel.textContent = `1 / ${totalPages}`;
+      }else if(isBackCover()){
+        pageLabel.textContent = `${totalPages} / ${totalPages}`;
+      }else{
+        pageLabel.textContent = `${cursor}–${cursor+1} / ${totalPages}`;
+      }
+
+      // Buttons visibility rules you described
+      // cover: only right
+      // back cover: only left
+      // spreads: both
+      btnLeft.disabled = isCover();
+      btnRight.disabled = isBackCover();
+
+      // For an even stricter “only show relevant buttons” feel:
+      btnLeft.style.visibility  = isCover() ? "hidden" : "visible";
+      btnRight.style.visibility = isBackCover() ? "hidden" : "visible";
+    }
+
+    function openToc(){
+      drawerBack.classList.add("open");
+      drawer.classList.add("open");
+    }
+    function closeToc(){
+      drawerBack.classList.remove("open");
+      drawer.classList.remove("open");
+    }
+    btnToc.addEventListener("click", openToc);
+    btnCloseToc.addEventListener("click", closeToc);
+    drawerBack.addEventListener("click", closeToc);
+
+    function runAction(action){
+      if(!action) return;
+      if(action.type === "modal"){
+        openModal(action.title || "note", action.html || "<p>(empty)</p>");
+      } else if(action.type === "link"){
+        window.open(action.href, "_blank", "noopener,noreferrer");
+      } else if(action.type === "jump"){
+        goToPage(action.page || 1);
+      } else {
+        openModal("note", `<p>Unknown action type:</p><div>${String(action.type)}</div>`);
+      }
+    }
+
+    function drawHotspotsForPage(pageNum, overlayEl){
+      overlayEl.innerHTML = "";
+      const list = HOTSPOTS.filter(h => h.page === pageNum);
 
       for(const h of list){
         const el = document.createElement("div");
         el.className = "hotspot";
-
-        // position in % of overlay
         el.style.left = `${h.x}%`;
         el.style.top = `${h.y}%`;
         el.style.width = `${h.w}%`;
         el.style.height = `${h.h}%`;
-
         el.title = (h.action?.label || h.action?.title || "interactive").toLowerCase();
 
         el.addEventListener("click", (e) => {
@@ -394,32 +616,161 @@
           runAction(h.action);
         });
 
-        overlay.appendChild(el);
+        overlayEl.appendChild(el);
       }
     }
 
-    function runAction(action){
-      if(!action) return;
-      if(action.type === "modal"){
-        openModal(action.title || "note", action.html || "<p>(empty)</p>");
-      }else if(action.type === "link"){
-        window.open(action.href, "_blank", "noopener,noreferrer");
-      }else if(action.type === "jump"){
-        const p = Math.max(1, Math.min(totalPages, action.page || 1));
-        renderPage(p);
-      }else{
-        openModal("note", `<p>Unknown action type:</p><div>${String(action.type)}</div>`);
-      }
+    async function renderSingle(pageNum){
+      // Single page rendered into A; B hidden
+      spreadEl.classList.add("single");
+      pageBEl.classList.add("hidden");
+
+      await renderInto(pageNum, canvasA, ctxA, overlayA);
+      overlayB.innerHTML = "";
     }
 
-    function buildToc(entries){
-      tocList.innerHTML = "";
-      for(const it of entries){
-        const row = document.createElement("div");
-        row.className = "item";
-        row.innerHTML = `<div class="t">${escapeHtml(it.title || "section")}</div><div class="p">${it.page}</div>`;
-        row.addEventListener("click", () => renderPage(it.page));
-        tocList.appendChild(row);
+    async function renderSpread(leftPage){
+      // Two pages side-by-side
+      spreadEl.classList.remove("single");
+      pageBEl.classList.remove("hidden");
+
+      await Promise.all([
+        renderInto(leftPage, canvasA, ctxA, overlayA),
+        renderInto(leftPage + 1, canvasB, ctxB, overlayB)
+      ]);
+    }
+
+    async function renderInto(pageNum, canvas, ctx, overlayEl){
+      const page = await pdfDoc.getPage(pageNum);
+
+      // Fit each page to half the container width (minus padding + seam)
+      const shellWidth = document.querySelector(".spreadShell").clientWidth;
+      const padding = 14 * 2;
+      const seam = 1;
+      const cols = spreadEl.classList.contains("single") ? 1 : 2;
+      const maxWidth = Math.floor((shellWidth - padding - (cols === 2 ? seam : 0)) / cols);
+
+      const unscaled = page.getViewport({ scale: 1 });
+      const scale = maxWidth / unscaled.width;
+      const viewport = page.getViewport({ scale });
+
+      canvas.width  = Math.floor(viewport.width * DPR);
+      canvas.height = Math.floor(viewport.height * DPR);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+      // overlay matches canvas
+      overlayEl.style.width = canvas.style.width;
+      overlayEl.style.height = canvas.style.height;
+
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      drawHotspotsForPage(pageNum, overlayEl);
+    }
+
+    async function render(){
+      if(!pdfDoc || rendering) return;
+      rendering = true;
+
+      uiUpdate();
+
+      if(isCover()){
+        await renderSingle(1);
+      } else if(isBackCover()){
+        await renderSingle(totalPages);
+      } else {
+        // ensure cursor is even for spreads (2,4,6...)
+        if(cursor % 2 === 1) cursor -= 1;
+        cursor = clamp(cursor, 2, totalPages - 1);
+        await renderSpread(cursor);
+      }
+
+      rendering = false;
+    }
+
+    function next(){
+      if(isCover()){
+        cursor = 2; // first spread begins at page 2
+      } else if(isBackCover()){
+        return;
+      } else {
+        cursor += 2;
+        if(cursor >= totalPages) cursor = totalPages; // back cover single
+      }
+      render();
+    }
+
+    function prev(){
+      if(isCover()){
+        return;
+      } else if(isBackCover()){
+        // back cover goes to last spread start
+        cursor = (totalPages % 2 === 0) ? (totalPages - 2) : (totalPages - 1);
+        // last spread should start at even page
+        if(cursor % 2 === 1) cursor -= 1;
+      } else {
+        cursor -= 2;
+        if(cursor <= 1) cursor = 1; // cover single
+      }
+      render();
+    }
+
+    function goToPage(page){
+      page = clamp(page, 1, totalPages);
+
+      if(page === 1){
+        cursor = 1;
+      } else if(page === totalPages){
+        cursor = totalPages;
+      } else {
+        // jump into the spread containing that page
+        cursor = (page % 2 === 0) ? page : (page - 1);
+        cursor = clamp(cursor, 2, totalPages - 1);
+      }
+
+      closeToc();
+      render();
+    }
+
+    function buildToc(){
+      tocRoot.innerHTML = "";
+
+      // If SECTIONS is empty, create a simple fallback list
+      const sections = (SECTIONS && SECTIONS.length)
+        ? SECTIONS
+        : [{ title: "pages", page: 1, items: Array.from({length: totalPages}, (_,i)=>({ title:`page ${i+1}`, page:i+1 })) }];
+
+      for(const s of sections){
+        const sec = document.createElement("div");
+        sec.className = "tocSection";
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = (s.title || "section").toLowerCase();
+        sec.appendChild(label);
+
+        // Section “header” jumps to its page
+        const header = document.createElement("div");
+        header.className = "tocItem";
+        header.innerHTML = `<div class="t">open ${escapeHtml(s.title || "section")}</div><div class="p">${s.page}</div>`;
+        header.addEventListener("click", () => goToPage(s.page || 1));
+        sec.appendChild(header);
+
+        // Section items
+        if(Array.isArray(s.items) && s.items.length){
+          for(const it of s.items){
+            const row = document.createElement("div");
+            row.className = "tocItem";
+            row.innerHTML = `<div class="t">${escapeHtml(it.title || "item")}</div><div class="p">${it.page}</div>`;
+            row.addEventListener("click", () => goToPage(it.page || 1));
+            sec.appendChild(row);
+          }
+        }
+
+        tocRoot.appendChild(sec);
       }
     }
 
@@ -429,92 +780,34 @@
       }[m]));
     }
 
-    async function loadOutlineAsToc(){
-      // If the PDF has an outline, turn it into TOC entries.
-      // Some PDFs don’t include an outline; we fall back to MANUAL_TOC.
-      const outline = await pdfDoc.getOutline();
-      if(!outline || outline.length === 0) return null;
+    btnLeft.addEventListener("click", prev);
+    btnRight.addEventListener("click", next);
 
-      const flat = [];
-      async function walk(items, depth=0){
-        for(const o of items){
-          let page = null;
-          try{
-            if(o.dest){
-              const dest = await pdfDoc.getDestination(o.dest);
-              const ref = dest && dest[0];
-              if(ref){
-                page = await pdfDoc.getPageIndex(ref) + 1;
-              }
-            }
-          }catch(_){}
-          if(page){
-            flat.push({ title: `${"— ".repeat(Math.min(depth,2))}${o.title}`.toLowerCase(), page });
-          }
-          if(o.items && o.items.length){
-            await walk(o.items, depth+1);
-          }
-        }
-      }
-      await walk(outline);
-      return flat.length ? flat : null;
-    }
-
-    function toggleToc(){
-      const toc = document.getElementById("toc");
-      const isHidden = toc.style.display === "none";
-      toc.style.display = isHidden ? "" : "none";
-      document.querySelector(".wrap").style.gridTemplateColumns = isHidden ? "280px 1fr" : "1fr";
-    }
-
-    // Controls
-    btnPrev.addEventListener("click", () => renderPage(Math.max(1, pageNum - 1)));
-    btnNext.addEventListener("click", () => renderPage(Math.min(totalPages, pageNum + 1)));
-
-    scrub.addEventListener("input", () => {
-      const p = parseInt(scrub.value, 10) || 1;
-      renderPage(p);
-    });
-
-    btnToc.addEventListener("click", toggleToc);
-
-    // Keyboard nav (nice for “flipbook” feel)
+    // Keyboard
     window.addEventListener("keydown", (e) => {
       if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
-      if(e.key === "ArrowLeft") btnPrev.click();
-      if(e.key === "ArrowRight") btnNext.click();
+      if(e.key === "ArrowLeft") prev();
+      if(e.key === "ArrowRight") next();
+      if(e.key.toLowerCase() === "t") openToc();
     });
 
-    // Re-render on resize (debounced)
+    // Resize re-render (debounced)
     let resizeTimer = null;
     window.addEventListener("resize", () => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => renderPage(pageNum), 120);
+      resizeTimer = setTimeout(() => render(), 120);
     });
 
-    // Boot
     (async function init(){
-      meta.textContent = "loading pdf…";
+      // Load PDF
       pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
       totalPages = pdfDoc.numPages;
 
-      scrub.min = "1";
-      scrub.max = String(totalPages);
-      scrub.value = "1";
+      tocMeta.textContent = `pages: ${totalPages}`;
+      buildToc();
 
-      meta.textContent = `pages: ${totalPages}`;
-
-      const outlineToc = await loadOutlineAsToc();
-      if(outlineToc){
-        buildToc(outlineToc);
-      }else if(MANUAL_TOC.length){
-        buildToc(MANUAL_TOC.map(x => ({...x, title: (x.title||"section").toLowerCase()})));
-      }else{
-        // minimal fallback: show page numbers
-        buildToc(Array.from({length: totalPages}, (_,i) => ({ title: `page ${i+1}`, page: i+1 })));
-      }
-
-      await renderPage(1);
+      cursor = 1;
+      await render();
     })();
   </script>
 </body>
