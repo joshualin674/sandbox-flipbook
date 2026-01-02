@@ -31,7 +31,7 @@
     .topbar{
       position: sticky;
       top: 0;
-      z-index: 50;
+      z-index: 60;
       display:flex;
       align-items:center;
       justify-content:space-between;
@@ -42,7 +42,7 @@
     }
     .topbar .left,
     .topbar .right{
-      width: 140px; /* keeps center truly centered */
+      width: 160px;
       display:flex;
       align-items:center;
       gap: 8px;
@@ -75,77 +75,36 @@
       padding: 16px 14px 28px;
     }
 
-    /* Desktop side arrows */
-    .stageFrame{
-      position: relative;
-      display: grid;
-      grid-template-columns: 56px 1fr 56px;
-      align-items: center;
-      gap: 14px;
-    }
-    
-    .sideNav{
-      width: 44px;
-      height: 44px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      user-select: none;
-    }
-    
-    .sideNav:hover{ background: rgba(255,255,255,.92); }
-    .sideNav:disabled{ opacity: .35; cursor: default; }
-    .sideNav.left{ justify-self: end; }
-    .sideNav.right{ justify-self: start; }
-    
-    /* Hide side arrows on mobile, keep topbar arrows */
-    @media (max-width: 900px){
-      .stageFrame{
-        grid-template-columns: 1fr;
-      }
-      .sideNav{
-        display:none;
-      }
-    }
-
-
     .spreadShell{
       border: 1px solid var(--line);
       border-radius: 18px;
       overflow:hidden;
       background: rgba(255,255,255,.25);
       box-shadow: 0 8px 40px rgba(0,0,0,.08);
+      position: relative;
+
+      /* helps the rotateY look nicer */
+      perspective: 900px;
     }
 
     .spread{
       display:grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1px; /* seam */
+      gap: 1px;              /* seam */
       background: var(--line);
       padding: 14px;
-    }
 
-        /* Flip-ish animation */
-    .spreadShell { position: relative; }
-    .spread {
-      will-change: transform, opacity;
+      transform-style: preserve-3d;
+      will-change: transform, opacity, filter;
       transform: translateX(0);
       opacity: 1;
-      transition: transform 220ms ease, opacity 220ms ease;
+      transition: transform 220ms ease, opacity 220ms ease, filter 220ms ease;
     }
-    
-    /* move current spread out */
+
+    /* Flip-ish motion states */
+    .spread.turning { filter: drop-shadow(0 10px 24px rgba(0,0,0,.12)); }
     .spread.turn-out-left  { transform: translateX(-24px) rotateY(6deg);  opacity: 0; }
     .spread.turn-out-right { transform: translateX( 24px) rotateY(-6deg); opacity: 0; }
-    
-    /* optional: subtle shadow during motion */
-    .spread.turning { filter: drop-shadow(0 10px 24px rgba(0,0,0,.12)); }
-    
 
     .page{
       position: relative;
@@ -154,7 +113,6 @@
       overflow:hidden;
     }
 
-    /* Each page has its own canvas + overlay */
     .page canvas{
       width: 100%;
       height: auto;
@@ -182,7 +140,7 @@
       outline-color: rgba(0,0,0,.45);
     }
 
-    /* Single-page mode: just show one column */
+    /* Single-page mode */
     .spread.single{
       grid-template-columns: 1fr;
     }
@@ -295,73 +253,66 @@
     .modalBody{ color: var(--ink); }
     .modalBody p{ margin: 0 0 10px; color: var(--muted); }
 
-    /* Mobile: reduce padding, keep it clean */
+    /* Mobile */
     @media (max-width: 860px){
-      .topbar .left, .topbar .right{ width: 110px; }
+      .topbar .left, .topbar .right{ width: 130px; }
       .spread{ padding: 10px; }
     }
 
-    /* Click-to-turn zones (desktop) */
+    /* Click-to-turn zones (desktop): HALF SCREEN */
     .clickZone{
       position: fixed;
-      top: 56px;     /* below topbar */
+      top: 56px;      /* below topbar */
       bottom: 0;
-      width: 50vw;   /* HALF the screen */
-      z-index: 40;   /* below topbar (50), above content */
+      width: 50vw;    /* half screen */
+      z-index: 40;    /* below topbar, above content */
       cursor: pointer;
     }
-    
-    /* left half / right half */
     .clickZone.left{ left: 0; }
     .clickZone.right{ right: 0; }
-    
-    /* Hide on mobile (swipe handles it) */
+
+    /* Hide click zones on mobile; swipe handles it */
     @media (max-width: 900px){
       .clickZone{ display:none; }
     }
-
-
   </style>
 </head>
 
 <body>
 
-  <!-- Minimal UI bar -->
+  <!-- Top bar: LEFT = arrows, RIGHT = toc -->
   <div class="topbar">
-    <!-- LEFT: arrows -->
     <div class="left">
       <button id="btnLeft" aria-label="Previous">←</button>
       <button id="btnRight" aria-label="Next">→</button>
     </div>
-  
+
     <div class="center" id="pageLabel">loading…</div>
-  
-    <!-- RIGHT: TOC -->
+
     <div class="right" style="justify-content:flex-end;">
       <button id="btnToc" aria-label="Table of contents">toc</button>
     </div>
   </div>
 
-
-
   <div class="stage">
     <div class="spreadShell">
-        <div class="spread" id="spread">
-          <div class="page" id="pageA">
-            <canvas id="canvasA"></canvas>
-            <div class="overlay" id="overlayA"></div>
-          </div>
-  
-          <div class="page" id="pageB">
-            <canvas id="canvasB"></canvas>
-            <div class="overlay" id="overlayB"></div>
-          </div>
+      <div class="spread" id="spread">
+        <div class="page" id="pageA">
+          <canvas id="canvasA"></canvas>
+          <div class="overlay" id="overlayA"></div>
+        </div>
+
+        <div class="page" id="pageB">
+          <canvas id="canvasB"></canvas>
+          <div class="overlay" id="overlayB"></div>
         </div>
       </div>
+    </div>
+
+    <!-- half-screen click zones -->
     <div class="clickZone left" id="zoneLeft" aria-hidden="true"></div>
     <div class="clickZone right" id="zoneRight" aria-hidden="true"></div>
   </div>
-
 
   <!-- TOC drawer -->
   <div class="drawerBack" id="drawerBack"></div>
@@ -374,7 +325,7 @@
     <div id="tocRoot"></div>
   </aside>
 
-  <!-- Modal for interactive content -->
+  <!-- Modal -->
   <div class="modalBack" id="modalBack" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modalHead">
@@ -394,167 +345,92 @@
 
     /**********************
      * TOC (easy to edit)
-     * - "page" is a PDF page number (1-based).
-     * - You can add items inside each section.
      **********************/
     const SECTIONS = [
-    {
-      title: "editor’s note & call for submissions",
-      page: 1,
-      items: [
-        { title: "editor’s note", page: 1 },
-        { title: "assembly by…", page: 2 },
-        { title: "contributors", page: 3 },
-        { title: "special thanks", page: 4 },
-        { title: "call for submissions", page: 5 },
-      ]
-    },
-    {
-      title: "open forum",
-      page: 3,
-      items: [
-        { title: "what makes a place matter", page: 1 },
-        { title: "what designers should pay attention to", page: 2 },
-        { title: "how virtual place takes shape", page: 3 },
-        { title: "how relationships shape perception of place", page: 4 },
-        { title: "how changing places change us", page: 5 },
-        { title: "design as problem-solving and agency", page: 6 },
-      ]
-    },
-    {
-      title: "reflections on open forum",
-      page: 23,
-      items: [
+      {
+        title: "editor’s note & call for submissions",
+        page: 1,
+        items: [
+          { title: "editor’s note", page: 1 },
+          { title: "assembly by…", page: 2 },
+          { title: "contributors", page: 3 },
+          { title: "special thanks", page: 4 },
+          { title: "call for submissions", page: 5 },
+        ]
+      },
+      {
+        title: "open forum",
+        page: 3,
+        items: [
+          { title: "what makes a place matter", page: 1 },
+          { title: "what designers should pay attention to", page: 2 },
+          { title: "how virtual place takes shape", page: 3 },
+          { title: "how relationships shape perception of place", page: 4 },
+          { title: "how changing places change us", page: 5 },
+          { title: "design as problem-solving and agency", page: 6 },
+        ]
+      },
+      { title: "reflections on open forum", page: 23, items: [
         { title: "miguel pita, student", page: 1 },
         { title: "michael stradley, instructor", page: 2 },
-      ]
-    },
-    {
-      title: "parking lot",
-      page: 25
-    },
-    {
-      title: "the afterlife of domestic space",
-      page: 27
-    },
-    {
-      title: "the wicked problem of place",
-      page: 37
-    },
-    {
-      title: "urban monastery",
-      page: 41
-    },
-    {
-      title: "place and placelessness in the digital realm",
-      page: 49,
-      items: [
-        { title: "abstract", page: 1 }
-      ]
-    },
-    {
-      title: "the reshaping of spatial memory & perception in the digital age",
-      page: 53,
-      items: [
+      ]},
+      { title: "parking lot", page: 25 },
+      { title: "the afterlife of domestic space", page: 27 },
+      { title: "the wicked problem of place", page: 37 },
+      { title: "urban monastery", page: 41 },
+      { title: "place and placelessness in the digital realm", page: 49, items: [{ title: "abstract", page: 1 }] },
+      { title: "the reshaping of spatial memory & perception in the digital age", page: 53, items: [
         { title: "abstract", page: 1 },
         { title: "what is place in the digital age?", page: 2 },
         { title: "how are digital worlds influencing our real one?", page: 3 },
         { title: "how do architects and designers respond?", page: 4 },
         { title: "conclusion", page: 5 },
-      ]
-    },
-    {
-      title: "an exploration of place and augmented reality",
-      page: 57,
-      items: [
+      ]},
+      { title: "an exploration of place and augmented reality", page: 57, items: [
         { title: "introduction", page: 1 },
         { title: "reality 1: decentralized meaning", page: 2 },
         { title: "reality 2: centralized meaning", page: 3 },
         { title: "reality 3: unmediated reality", page: 4 },
         { title: "conclusion", page: 5 },
-      ]
-    },
-    {
-      title: "sensor-field",
-      page: 59,
-      items: [
+      ]},
+      { title: "sensor-field", page: 59, items: [
         { title: "making socio-ecological place across spacetime", page: 1 },
         { title: "mapper", page: 2 },
         { title: "sensor-field", page: 3 },
         { title: "spine-line interventions", page: 4 },
-      ]
-    },
-    {
-      title: "public space & landscape",
-      page: 69,
-      items: [
+      ]},
+      { title: "public space & landscape", page: 69, items: [
         { title: "introduction", page: 1 },
         { title: "the american dream in catalunya", page: 2 },
         { title: "environmental concerns of the metropolitan territory", page: 3 },
         { title: "territory of mosaics", page: 4 },
         { title: "intervention strategy", page: 5 },
-      ]
-    },
-    {
-      title: "fields of convergence",
-      page: 81
-    },
-    {
-      title: "a (nashvillian’s) tale of two parthenons",
-      page: 103,
-      items: [
+      ]},
+      { title: "fields of convergence", page: 81 },
+      { title: "a (nashvillian’s) tale of two parthenons", page: 103, items: [
         { title: "birth", page: 1 },
         { title: "death", page: 2 },
         { title: "reincarnation", page: 3 },
-      ]
-    },
-    {
-      title: "bankhead",
-      page: 109,
-      items: [
+      ]},
+      { title: "bankhead", page: 109, items: [
         { title: "introduction", page: 1 },
         { title: "disparity", page: 2 },
         { title: "complexity", page: 3 },
-      ]
-    },
-    {
-      title: "porous housing",
-      page: 119,
-      items: [
+      ]},
+      { title: "porous housing", page: 119, items: [
         { title: "reimagining urban domesticity through thresholds", page: 1 },
         { title: "conclusions", page: 2 },
-      ]
-    },
-    {
-      title: "let’s meet at the bars",
-      page: 121,
-      items: [
-        { title: "posters", page: 1 },
-      ]
-    },
-    {
-      title: "the (woman) architect",
-      page: 123,
-      items: [
-        { title: "invisibility and place", page: 1 },
-      ]
-    },
-    {
-      title: "closing remarks",
-      page: 125,
-      items: [
+      ]},
+      { title: "let’s meet at the bars", page: 121, items: [{ title: "posters", page: 1 }] },
+      { title: "the (woman) architect", page: 123, items: [{ title: "invisibility and place", page: 1 }] },
+      { title: "closing remarks", page: 125, items: [
         { title: "closing remarks", page: 1 },
         { title: "contact us", page: 2 },
-      ]
-    }
-  ];
-
+      ]},
+    ];
 
     /**********************
-     * HOTSPOTS (interactive regions)
-     * - page: PDF page #
-     * - x,y,w,h are % of that page (0..100)
-     * - slot: "A" (left) or "B" (right) optional; we’ll auto place based on which page is visible.
+     * HOTSPOTS
      **********************/
     const HOTSPOTS = [
       // { page: 2, x: 10, y: 20, w: 30, h: 10, action:{ type:"modal", title:"note", html:"<p>hello</p>" } },
@@ -567,14 +443,14 @@
     const $ = (s) => document.querySelector(s);
 
     const spreadEl = $("#spread");
+    const pageAEl = $("#pageA");
+    const pageBEl = $("#pageB");
 
     const canvasA = $("#canvasA");
     const canvasB = $("#canvasB");
     const ctxA = canvasA.getContext("2d");
     const ctxB = canvasB.getContext("2d");
 
-    const pageAEl = $("#pageA");
-    const pageBEl = $("#pageB");
     const overlayA = $("#overlayA");
     const overlayB = $("#overlayB");
 
@@ -582,13 +458,9 @@
     const btnRight = $("#btnRight");
     const btnToc = $("#btnToc");
     const pageLabel = $("#pageLabel");
-    // const btnSideLeft  = $("#btnSideLeft");
-    // const btnSideRight = $("#btnSideRight");
-    const zoneLeft  = $("#zoneLeft");
+
+    const zoneLeft = $("#zoneLeft");
     const zoneRight = $("#zoneRight");
-
-    
-
 
     const drawer = $("#drawer");
     const drawerBack = $("#drawerBack");
@@ -604,13 +476,16 @@
     let pdfDoc = null;
     let totalPages = 1;
 
-    // "cursor" is the left page number of a spread (or the single page for cover/back cover)
+    // cursor = left page number of current spread (or single page for cover/back cover)
     let cursor = 1;
 
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let rendering = false;
 
     function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+    function isCover(){ return cursor === 1; }
+    function isBackCover(){ return cursor === totalPages; }
 
     function openModal(title, html){
       modalTitle.textContent = (title || "note").toLowerCase();
@@ -627,55 +502,30 @@
     modalBack.addEventListener("click", (e) => { if(e.target === modalBack) closeModal(); });
     window.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 
-
-    function isCover(){ return cursor === 1; }
-    function isBackCover(){ return cursor === totalPages; }
-    function isSpread(){
-      // Spread starts at 2, then 4, 6, ... and must have a right page available
-      return cursor >= 2 && cursor < totalPages;
-    }
-    function rightPageNum(){
-      return isSpread() ? cursor + 1 : null;
-    }
-
     function uiUpdate(){
-      // Page label (upper center)
-      if(isCover()){
+      // label
+      if (isCover()){
         pageLabel.textContent = `1 / ${totalPages}`;
-      }else if(isBackCover()){
+      } else if (isBackCover()){
         pageLabel.textContent = `${totalPages} / ${totalPages}`;
-      }else{
+      } else {
         pageLabel.textContent = `${cursor}–${cursor+1} / ${totalPages}`;
       }
+
+      // arrows
       btnLeft.disabled = isCover();
       btnRight.disabled = isBackCover();
 
-      // For an even stricter “only show relevant buttons” feel:
       btnLeft.style.visibility  = isCover() ? "hidden" : "visible";
       btnRight.style.visibility = isBackCover() ? "hidden" : "visible";
-      // Update click zones based on where we are
-      if (zoneLeft && zoneRight) {
-        zoneLeft.style.pointerEvents  = isCover() ? "none" : "auto";
-        zoneRight.style.pointerEvents = isBackCover() ? "none" : "auto";
-      
-        // Optional: hide the unusable side so it feels intentional
-        zoneLeft.style.opacity  = isCover() ? "0" : "1";
-        zoneRight.style.opacity = isBackCover() ? "0" : "1";
-      }
 
+      // click zones
+      zoneLeft.style.pointerEvents  = isCover() ? "none" : "auto";
+      zoneRight.style.pointerEvents = isBackCover() ? "none" : "auto";
+
+      zoneLeft.style.opacity  = isCover() ? "0" : "1";
+      zoneRight.style.opacity = isBackCover() ? "0" : "1";
     }
-
-    zoneLeft?.addEventListener("click", () => {
-    // On cover: left side should do nothing (only forward)
-      if (isCover()) return;
-      turn("prev");
-    });
-    
-    zoneRight?.addEventListener("click", () => {
-      // On back cover: right side should do nothing (only backward)
-      if (isBackCover()) return;
-      turn("next");
-    });
 
     function openToc(){
       drawerBack.classList.add("open");
@@ -696,7 +546,7 @@
       } else if(action.type === "link"){
         window.open(action.href, "_blank", "noopener,noreferrer");
       } else if(action.type === "jump"){
-        goToPage(action.page || 1);
+        goToPage(action.page || 1, true);
       } else {
         openModal("note", `<p>Unknown action type:</p><div>${String(action.type)}</div>`);
       }
@@ -725,30 +575,9 @@
       }
     }
 
-    async function renderSingle(pageNum){
-      // Single page rendered into A; B hidden
-      spreadEl.classList.add("single");
-      pageBEl.classList.add("hidden");
-
-      await renderInto(pageNum, canvasA, ctxA, overlayA);
-      overlayB.innerHTML = "";
-    }
-
-    async function renderSpread(leftPage){
-      // Two pages side-by-side
-      spreadEl.classList.remove("single");
-      pageBEl.classList.remove("hidden");
-
-      await Promise.all([
-        renderInto(leftPage, canvasA, ctxA, overlayA),
-        renderInto(leftPage + 1, canvasB, ctxB, overlayB)
-      ]);
-    }
-
     async function renderInto(pageNum, canvas, ctx, overlayEl){
       const page = await pdfDoc.getPage(pageNum);
 
-      // Fit each page to half the container width (minus padding + seam)
       const shellWidth = document.querySelector(".spreadShell").clientWidth;
       const padding = 14 * 2;
       const seam = 1;
@@ -764,7 +593,6 @@
       canvas.style.width = `${Math.floor(viewport.width)}px`;
       canvas.style.height = `${Math.floor(viewport.height)}px`;
 
-      // overlay matches canvas
       overlayEl.style.width = canvas.style.width;
       overlayEl.style.height = canvas.style.height;
 
@@ -772,13 +600,30 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       await page.render({ canvasContext: ctx, viewport }).promise;
-
       drawHotspotsForPage(pageNum, overlayEl);
     }
 
-    async function render(){
-      if(!pdfDoc || rendering) return;
-      rendering = true;
+    async function renderSingle(pageNum){
+      spreadEl.classList.add("single");
+      pageBEl.classList.add("hidden");
+
+      await renderInto(pageNum, canvasA, ctxA, overlayA);
+      overlayB.innerHTML = "";
+    }
+
+    async function renderSpread(leftPage){
+      spreadEl.classList.remove("single");
+      pageBEl.classList.remove("hidden");
+
+      await Promise.all([
+        renderInto(leftPage, canvasA, ctxA, overlayA),
+        renderInto(leftPage + 1, canvasB, ctxB, overlayB)
+      ]);
+    }
+
+    async function render(force = false){
+      if(!pdfDoc) return;
+      if(rendering && !force) return;
 
       uiUpdate();
 
@@ -787,40 +632,34 @@
       } else if(isBackCover()){
         await renderSingle(totalPages);
       } else {
-        // ensure cursor is even for spreads (2,4,6...)
         if(cursor % 2 === 1) cursor -= 1;
         cursor = clamp(cursor, 2, totalPages - 1);
         await renderSpread(cursor);
       }
-
-      rendering = false;
     }
 
-    async function turn(dir){ 
-      // dir: "next" or "prev"
+    async function turn(dir){
+      // dir: "next" | "prev"
       if (rendering) return;
-    
-      // don’t animate if there’s nowhere to go
       if (dir === "prev" && isCover()) return;
       if (dir === "next" && isBackCover()) return;
-    
-      rendering = true; // lock input during anim
+
+      rendering = true;
+
       const outClass = dir === "next" ? "turn-out-left" : "turn-out-right";
-    
       spreadEl.classList.add("turning", outClass);
-    
-      // wait for the “out” transition to finish
+
       await new Promise(res => setTimeout(res, 220));
-    
-      // update cursor (your existing logic)
-      if (dir === "next") {
+
+      // move cursor
+      if (dir === "next"){
         if (isCover()) cursor = 2;
         else {
           cursor += 2;
           if (cursor >= totalPages) cursor = totalPages;
         }
       } else {
-        if (isBackCover()) {
+        if (isBackCover()){
           cursor = (totalPages % 2 === 0) ? (totalPages - 2) : (totalPages - 1);
           if (cursor % 2 === 1) cursor -= 1;
         } else {
@@ -828,54 +667,22 @@
           if (cursor <= 1) cursor = 1;
         }
       }
-    
-      // instantly reset transform so new spread starts “in place”
+
+      // reset animation state
       spreadEl.classList.remove(outClass);
       spreadEl.style.transition = "none";
       spreadEl.style.transform = "translateX(0)";
       spreadEl.style.opacity = "1";
-      // force reflow so transition reinstates cleanly
       void spreadEl.offsetHeight;
       spreadEl.style.transition = "";
-    
-      // render new content
-      await render();
-    
+
+      await render(true);
+
       spreadEl.classList.remove("turning");
       rendering = false;
     }
 
-
-    function next(){
-      if(isCover()){
-        cursor = 2; // first spread begins at page 2
-      } else if(isBackCover()){
-        return;
-      } else {
-        cursor += 2;
-        if(cursor >= totalPages) cursor = totalPages; // back cover single
-      }
-      render();
-    }
-
-    function prev(){
-      if(isCover()){
-        return;
-      } else if(isBackCover()){
-        // back cover goes to last spread start
-        cursor = (totalPages % 2 === 0) ? (totalPages - 2) : (totalPages - 1);
-        // last spread should start at even page
-        if(cursor % 2 === 1) cursor -= 1;
-      } else {
-        cursor -= 2;
-        if(cursor <= 1) cursor = 1; // cover single
-      }
-      render();
-    }
-
-    
-
-    function goToPage(page){
+    function goToPage(page, animate = false){
       page = clamp(page, 1, totalPages);
 
       if(page === 1){
@@ -883,19 +690,30 @@
       } else if(page === totalPages){
         cursor = totalPages;
       } else {
-        // jump into the spread containing that page
         cursor = (page % 2 === 0) ? page : (page - 1);
         cursor = clamp(cursor, 2, totalPages - 1);
       }
 
       closeToc();
-      render();
+
+      if (animate){
+        // choose direction heuristically
+        const dir = (page >= cursor) ? "next" : "prev";
+        // render without the out transition (fast + no bugs)
+        render();
+      } else {
+        render();
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+      }[m]));
     }
 
     function buildToc(){
       tocRoot.innerHTML = "";
-
-      // If SECTIONS is empty, create a simple fallback list
       const sections = (SECTIONS && SECTIONS.length)
         ? SECTIONS
         : [{ title: "pages", page: 1, items: Array.from({length: totalPages}, (_,i)=>({ title:`page ${i+1}`, page:i+1 })) }];
@@ -909,14 +727,12 @@
         label.textContent = (s.title || "section").toLowerCase();
         sec.appendChild(label);
 
-        // Section “header” jumps to its page
         const header = document.createElement("div");
         header.className = "tocItem";
         header.innerHTML = `<div class="t">open ${escapeHtml(s.title || "section")}</div><div class="p">${s.page}</div>`;
         header.addEventListener("click", () => goToPage(s.page || 1));
         sec.appendChild(header);
 
-        // Section items
         if(Array.isArray(s.items) && s.items.length){
           for(const it of s.items){
             const row = document.createElement("div");
@@ -931,57 +747,13 @@
       }
     }
 
-    function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, (m) => ({
-        "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
-      }[m]));
-    }
+    // Click zones
+    zoneLeft.addEventListener("click", () => turn("prev"));
+    zoneRight.addEventListener("click", () => turn("next"));
 
-    // Swipe navigation (mobile)
-    (function enableSwipe(){
-      const target = document.querySelector(".spreadShell"); // swipe on the book area
-      if(!target) return;
-    
-      let startX = 0;
-      let startY = 0;
-      let tracking = false;
-    
-      const MIN_DIST = 40;      // px
-      const MAX_OFF_AXIS = 60;  // px (avoid vertical scroll triggering)
-    
-      target.addEventListener("touchstart", (e) => {
-        if (!e.touches || e.touches.length !== 1) return;
-        tracking = true;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-      }, { passive: true });
-    
-      target.addEventListener("touchend", (e) => {
-        if(!tracking) return;
-        tracking = false;
-    
-        const t = e.changedTouches && e.changedTouches[0];
-        if(!t) return;
-    
-        const dx = t.clientX - startX;
-        const dy = t.clientY - startY;
-    
-        if (Math.abs(dx) < MIN_DIST) return;
-        if (Math.abs(dy) > MAX_OFF_AXIS) return;
-    
-        // swipe left => next, swipe right => prev
-        if (dx < 0) turn("next");
-        else turn("prev");
-      }, { passive: true });
-    })();
-
-    
-    btnLeft.addEventListener("click", turn("prev"));
-    btnRight.addEventListener("click", turn("next"));
-
-    // btnSideLeft.addEventListener("click", prev);
-    // btnSideRight.addEventListener("click", next);
-
+    // Buttons (IMPORTANT: pass a function, don’t call immediately)
+    btnLeft.addEventListener("click", () => turn("prev"));
+    btnRight.addEventListener("click", () => turn("next"));
 
     // Keyboard
     window.addEventListener("keydown", (e) => {
@@ -991,6 +763,40 @@
       if(e.key.toLowerCase() === "t") openToc();
     });
 
+    // Swipe (mobile)
+    (function enableSwipe(){
+      const target = document.querySelector(".spreadShell");
+      if(!target) return;
+
+      let startX = 0, startY = 0, tracking = false;
+      const MIN_DIST = 40;
+      const MAX_OFF_AXIS = 60;
+
+      target.addEventListener("touchstart", (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        tracking = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+
+      target.addEventListener("touchend", (e) => {
+        if(!tracking) return;
+        tracking = false;
+
+        const t = e.changedTouches && e.changedTouches[0];
+        if(!t) return;
+
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+
+        if (Math.abs(dx) < MIN_DIST) return;
+        if (Math.abs(dy) > MAX_OFF_AXIS) return;
+
+        if (dx < 0) turn("next");
+        else turn("prev");
+      }, { passive: true });
+    })();
+
     // Resize re-render (debounced)
     let resizeTimer = null;
     window.addEventListener("resize", () => {
@@ -999,7 +805,6 @@
     });
 
     (async function init(){
-      // Load PDF
       pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
       totalPages = pdfDoc.numPages;
 
