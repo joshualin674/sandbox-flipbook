@@ -283,6 +283,21 @@
       .topbar .left, .topbar .right{ width: 110px; }
       .spread{ padding: 10px; }
     }
+
+    /* Desktop: hide topbar arrows (use side arrows instead) */
+    @media (min-width: 901px){
+      #btnLeft,
+      #btnRight{
+        display: none;
+      }
+    }
+
+    @media (min-width: 901px){
+      .topbar .left{ width: 0; }
+      .topbar .right{ width: auto; }
+    }
+
+
   </style>
 </head>
 
