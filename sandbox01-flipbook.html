@@ -287,16 +287,14 @@
     /* Click-to-turn zones (desktop) */
     .clickZone{
       position: fixed;
-      top: 56px;
+      top: 56px;     /* below topbar */
       bottom: 0;
-      width: 18vw;            /* adjust: 15–22vw feels good */
-      max-width: 260px;
-      z-index: 40;            /* below topbar (50), above content */
+      width: 50vw;   /* HALF the screen */
+      z-index: 40;   /* below topbar (50), above content */
       cursor: pointer;
-      /* Uncomment to debug:
-      background: rgba(255,0,0,.06);
-      */
     }
+    
+    /* left half / right half */
     .clickZone.left{ left: 0; }
     .clickZone.right{ right: 0; }
     
@@ -304,6 +302,7 @@
     @media (max-width: 900px){
       .clickZone{ display:none; }
     }
+
 
   </style>
 </head>
