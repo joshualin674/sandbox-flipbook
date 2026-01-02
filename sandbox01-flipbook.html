@@ -130,6 +130,23 @@
       padding: 14px;
     }
 
+        /* Flip-ish animation */
+    .spreadShell { position: relative; }
+    .spread {
+      will-change: transform, opacity;
+      transform: translateX(0);
+      opacity: 1;
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+    
+    /* move current spread out */
+    .spread.turn-out-left  { transform: translateX(-24px) rotateY(6deg);  opacity: 0; }
+    .spread.turn-out-right { transform: translateX( 24px) rotateY(-6deg); opacity: 0; }
+    
+    /* optional: subtle shadow during motion */
+    .spread.turning { filter: drop-shadow(0 10px 24px rgba(0,0,0,.12)); }
+    
+
     .page{
       position: relative;
       background: white;
@@ -648,13 +665,13 @@
     zoneLeft?.addEventListener("click", () => {
     // On cover: left side should do nothing (only forward)
       if (isCover()) return;
-      prev();
+      turn("prev");
     });
     
     zoneRight?.addEventListener("click", () => {
       // On back cover: right side should do nothing (only backward)
       if (isBackCover()) return;
-      next();
+      turn("next");
     });
 
     function openToc(){
@@ -775,6 +792,56 @@
 
       rendering = false;
     }
+
+    async function turn(dir){ 
+      // dir: "next" or "prev"
+      if (rendering) return;
+    
+      // don’t animate if there’s nowhere to go
+      if (dir === "prev" && isCover()) return;
+      if (dir === "next" && isBackCover()) return;
+    
+      rendering = true; // lock input during anim
+      const outClass = dir === "next" ? "turn-out-left" : "turn-out-right";
+    
+      spreadEl.classList.add("turning", outClass);
+    
+      // wait for the “out” transition to finish
+      await new Promise(res => setTimeout(res, 220));
+    
+      // update cursor (your existing logic)
+      if (dir === "next") {
+        if (isCover()) cursor = 2;
+        else {
+          cursor += 2;
+          if (cursor >= totalPages) cursor = totalPages;
+        }
+      } else {
+        if (isBackCover()) {
+          cursor = (totalPages % 2 === 0) ? (totalPages - 2) : (totalPages - 1);
+          if (cursor % 2 === 1) cursor -= 1;
+        } else {
+          cursor -= 2;
+          if (cursor <= 1) cursor = 1;
+        }
+      }
+    
+      // instantly reset transform so new spread starts “in place”
+      spreadEl.classList.remove(outClass);
+      spreadEl.style.transition = "none";
+      spreadEl.style.transform = "translateX(0)";
+      spreadEl.style.opacity = "1";
+      // force reflow so transition reinstates cleanly
+      void spreadEl.offsetHeight;
+      spreadEl.style.transition = "";
+    
+      // render new content
+      await render();
+    
+      spreadEl.classList.remove("turning");
+      rendering = false;
+    }
+
 
     function next(){
       if(isCover()){
@@ -900,14 +967,14 @@
         if (Math.abs(dy) > MAX_OFF_AXIS) return;
     
         // swipe left => next, swipe right => prev
-        if (dx < 0) next();
-        else prev();
+        if (dx < 0) turn("next");
+        else turn("prev");
       }, { passive: true });
     })();
 
     
-    btnLeft.addEventListener("click", prev);
-    btnRight.addEventListener("click", next);
+    btnLeft.addEventListener("click", turn("prev"));
+    btnRight.addEventListener("click", turn("next"));
 
     // btnSideLeft.addEventListener("click", prev);
     // btnSideRight.addEventListener("click", next);
@@ -916,8 +983,8 @@
     // Keyboard
     window.addEventListener("keydown", (e) => {
       if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
-      if(e.key === "ArrowLeft") prev();
-      if(e.key === "ArrowRight") next();
+      if(e.key === "ArrowLeft") turn("prev");
+      if(e.key === "ArrowRight") turn("next");
       if(e.key.toLowerCase() === "t") openToc();
     });
 
