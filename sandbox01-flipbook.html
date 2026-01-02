@@ -879,6 +879,10 @@
     btnLeft.addEventListener("click", prev);
     btnRight.addEventListener("click", next);
 
+    btnSideLeft.addEventListener("click", prev);
+    btnSideRight.addEventListener("click", next);
+
+
     // Keyboard
     window.addEventListener("keydown", (e) => {
       if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
