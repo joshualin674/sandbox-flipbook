@@ -75,6 +75,45 @@
       padding: 16px 14px 28px;
     }
 
+    /* Desktop side arrows */
+    .stageFrame{
+      position: relative;
+      display: grid;
+      grid-template-columns: 56px 1fr 56px;
+      align-items: center;
+      gap: 14px;
+    }
+    
+    .sideNav{
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      user-select: none;
+    }
+    
+    .sideNav:hover{ background: rgba(255,255,255,.92); }
+    .sideNav:disabled{ opacity: .35; cursor: default; }
+    .sideNav.left{ justify-self: end; }
+    .sideNav.right{ justify-self: start; }
+    
+    /* Hide side arrows on mobile, keep topbar arrows */
+    @media (max-width: 900px){
+      .stageFrame{
+        grid-template-columns: 1fr;
+      }
+      .sideNav{
+        display:none;
+      }
+    }
+
+
     .spreadShell{
       border: 1px solid var(--line);
       border-radius: 18px;
@@ -264,24 +303,27 @@
   </div>
 
   <div class="stage">
-    <div class="spreadShell">
-      <div class="spread" id="spread">
-
-        <!-- Left page -->
-        <div class="page" id="pageA">
-          <canvas id="canvasA"></canvas>
-          <div class="overlay" id="overlayA"></div>
+    <div class="stageFrame">
+      <button class="sideNav left" id="btnSideLeft" aria-label="Previous page">←</button>
+  
+      <div class="spreadShell">
+        <div class="spread" id="spread">
+          <div class="page" id="pageA">
+            <canvas id="canvasA"></canvas>
+            <div class="overlay" id="overlayA"></div>
+          </div>
+  
+          <div class="page" id="pageB">
+            <canvas id="canvasB"></canvas>
+            <div class="overlay" id="overlayB"></div>
+          </div>
         </div>
-
-        <!-- Right page -->
-        <div class="page" id="pageB">
-          <canvas id="canvasB"></canvas>
-          <div class="overlay" id="overlayB"></div>
-        </div>
-
       </div>
+  
+      <button class="sideNav right" id="btnSideRight" aria-label="Next page">→</button>
     </div>
   </div>
+
 
   <!-- TOC drawer -->
   <div class="drawerBack" id="drawerBack"></div>
@@ -502,6 +544,9 @@
     const btnRight = $("#btnRight");
     const btnToc = $("#btnToc");
     const pageLabel = $("#pageLabel");
+    const btnSideLeft  = $("#btnSideLeft");
+    const btnSideRight = $("#btnSideRight");
+
 
     const drawer = $("#drawer");
     const drawerBack = $("#drawerBack");
@@ -559,7 +604,7 @@
       }else{
         pageLabel.textContent = `${cursor}–${cursor+1} / ${totalPages}`;
       }
-
+      
       // Buttons visibility rules you described
       // cover: only right
       // back cover: only left
@@ -570,6 +615,16 @@
       // For an even stricter “only show relevant buttons” feel:
       btnLeft.style.visibility  = isCover() ? "hidden" : "visible";
       btnRight.style.visibility = isBackCover() ? "hidden" : "visible";
+
+      // mirror state to side arrows (desktop)
+      if (btnSideLeft && btnSideRight) {
+        btnSideLeft.disabled = isCover();
+        btnSideRight.disabled = isBackCover();
+      
+        btnSideLeft.style.visibility  = isCover() ? "hidden" : "visible";
+        btnSideRight.style.visibility = isBackCover() ? "hidden" : "visible";
+      }
+
     }
 
     function openToc(){
@@ -718,6 +773,8 @@
       render();
     }
 
+    
+
     function goToPage(page){
       page = clamp(page, 1, totalPages);
 
@@ -780,6 +837,45 @@
       }[m]));
     }
 
+    // Swipe navigation (mobile)
+    (function enableSwipe(){
+      const target = document.querySelector(".spreadShell"); // swipe on the book area
+      if(!target) return;
+    
+      let startX = 0;
+      let startY = 0;
+      let tracking = false;
+    
+      const MIN_DIST = 40;      // px
+      const MAX_OFF_AXIS = 60;  // px (avoid vertical scroll triggering)
+    
+      target.addEventListener("touchstart", (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        tracking = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+    
+      target.addEventListener("touchend", (e) => {
+        if(!tracking) return;
+        tracking = false;
+    
+        const t = e.changedTouches && e.changedTouches[0];
+        if(!t) return;
+    
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+    
+        if (Math.abs(dx) < MIN_DIST) return;
+        if (Math.abs(dy) > MAX_OFF_AXIS) return;
+    
+        // swipe left => next, swipe right => prev
+        if (dx < 0) next();
+        else prev();
+      }, { passive: true });
+    })();
+
+    
     btnLeft.addEventListener("click", prev);
     btnRight.addEventListener("click", next);
 
