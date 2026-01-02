@@ -283,6 +283,28 @@
       .topbar .left, .topbar .right{ width: 110px; }
       .spread{ padding: 10px; }
     }
+
+    /* Click-to-turn zones (desktop) */
+    .clickZone{
+      position: fixed;
+      top: 56px;
+      bottom: 0;
+      width: 18vw;            /* adjust: 15–22vw feels good */
+      max-width: 260px;
+      z-index: 40;            /* below topbar (50), above content */
+      cursor: pointer;
+      /* Uncomment to debug:
+      background: rgba(255,0,0,.06);
+      */
+    }
+    .clickZone.left{ left: 0; }
+    .clickZone.right{ right: 0; }
+    
+    /* Hide on mobile (swipe handles it) */
+    @media (max-width: 900px){
+      .clickZone{ display:none; }
+    }
+
   </style>
 </head>
 
@@ -303,10 +325,7 @@
   </div>
 
   <div class="stage">
-    <div class="stageFrame">
-      <button class="sideNav left" id="btnSideLeft" aria-label="Previous page">←</button>
-  
-      <div class="spreadShell">
+    <div class="spreadShell">
         <div class="spread" id="spread">
           <div class="page" id="pageA">
             <canvas id="canvasA"></canvas>
@@ -319,9 +338,8 @@
           </div>
         </div>
       </div>
-  
-      <button class="sideNav right" id="btnSideRight" aria-label="Next page">→</button>
-    </div>
+    <div class="clickZone left" id="zoneLeft" aria-hidden="true"></div>
+    <div class="clickZone right" id="zoneRight" aria-hidden="true"></div>
   </div>
 
 
@@ -544,8 +562,12 @@
     const btnRight = $("#btnRight");
     const btnToc = $("#btnToc");
     const pageLabel = $("#pageLabel");
-    const btnSideLeft  = $("#btnSideLeft");
-    const btnSideRight = $("#btnSideRight");
+    // const btnSideLeft  = $("#btnSideLeft");
+    // const btnSideRight = $("#btnSideRight");
+    const zoneLeft  = $("#zoneLeft");
+    const zoneRight = $("#zoneRight");
+
+    
 
 
     const drawer = $("#drawer");
@@ -585,6 +607,7 @@
     modalBack.addEventListener("click", (e) => { if(e.target === modalBack) closeModal(); });
     window.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 
+
     function isCover(){ return cursor === 1; }
     function isBackCover(){ return cursor === totalPages; }
     function isSpread(){
@@ -617,13 +640,35 @@
       btnRight.style.visibility = isBackCover() ? "hidden" : "visible";
 
       // mirror state to side arrows (desktop)
-      if (btnSideLeft && btnSideRight) {
-        btnSideLeft.disabled = isCover();
-        btnSideRight.disabled = isBackCover();
+      // if (btnSideLeft && btnSideRight) {
+      //   btnSideLeft.disabled = isCover();
+      //   btnSideRight.disabled = isBackCover();
       
-        btnSideLeft.style.visibility  = isCover() ? "hidden" : "visible";
-        btnSideRight.style.visibility = isBackCover() ? "hidden" : "visible";
-      }
+      //   btnSideLeft.style.visibility  = isCover() ? "hidden" : "visible";
+      //   btnSideRight.style.visibility = isBackCover() ? "hidden" : "visible";
+      // }
+
+      // Update click zones based on where we are
+      if (zoneLeft && zoneRight) {
+        zoneLeft.style.pointerEvents  = isCover() ? "none" : "auto";
+        zoneRight.style.pointerEvents = isBackCover() ? "none" : "auto";
+      
+        // Optional: hide the unusable side so it feels intentional
+        zoneLeft.style.opacity  = isCover() ? "0" : "1";
+        zoneRight.style.opacity = isBackCover() ? "0" : "1";
+    }
+
+    zoneLeft?.addEventListener("click", () => {
+      // On cover: left side should do nothing (only forward)
+      if (isCover()) return;
+      prev();
+    });
+    
+    zoneRight?.addEventListener("click", () => {
+      // On back cover: right side should do nothing (only backward)
+      if (isBackCover()) return;
+      next();
+    });
 
     }
 
@@ -879,8 +924,8 @@
     btnLeft.addEventListener("click", prev);
     btnRight.addEventListener("click", next);
 
-    btnSideLeft.addEventListener("click", prev);
-    btnSideRight.addEventListener("click", next);
+    // btnSideLeft.addEventListener("click", prev);
+    // btnSideRight.addEventListener("click", next);
 
 
     // Keyboard
